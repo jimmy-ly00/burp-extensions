@@ -58,7 +58,7 @@ class BurpExtender(IBurpExtender, ISessionHandlingAction):
     api_endpoint = "/api/v2/endpoint"
     StringToSign1 = "GET" + "\n" + timestamp + "\n" + ContentMD5 + "\n"+ ContentType + "\n" + C1_key + "\n" + api_endpoint
 
-    # Remove old digest header and get Authorization Bearer from HTTP headers
+    # Remove old HTTP headers
     for header in newHeaders:
       if (header.startswith("Content-Type")):
         headers.remove(header)
@@ -69,15 +69,15 @@ class BurpExtender(IBurpExtender, ISessionHandlingAction):
       if (header.startswith("X-Timestamp")):
         headers.remove(header)
 
-    # # hacky method if headers has GETTEST it will be a valid GET too
+    # Hacky method (no regex) to check if GET or POST/PUT HTTP method e.g. if headers has GETTEST it will be a valid GET too
     for header in newHeaders:
       if (header.startswith("GET")):
         headers.add('Content-Type: text/plain')
       if (header.startswith("POST")) or (header.startswith("PUT")):
         headers.add('Content-Type: application/json')
 
-    # # write a message to our output stream
-    proc = subprocess.Popen(['py',"./encrypt.py", StringToSign1],stdout=subprocess.PIPE)
+    # Call external program to run python program. Uses locally installed pycryptodome cryptographic signing functions
+    proc = subprocess.Popen(['py',"./sign.py", StringToSign1],stdout=subprocess.PIPE)
     output = proc.stdout.read().strip()
     proc.stdout.close()
 
@@ -85,9 +85,9 @@ class BurpExtender(IBurpExtender, ISessionHandlingAction):
     headers.add("X-Signature: " + output)
     headers.add("X-APIkey: " + C1_key)
 
-    # Build request with bypass headers
+    # Build request with new headers
     message = self._helpers.buildHttpMessage(headers, reqBody)
 
-    # Update Request with New Header
+    # Update Request with new headers
     currentRequest.setRequest(message)
     return
