@@ -3,7 +3,7 @@ A collection of burp extensions that may be useful for others. These are require
 
 ## Instructions
 1. Add via Extender > Add > Extension Type: Python 
-2. Project Options > Add > Under 'Rule Actions' > Add > Invoke a Burp Extension > Select '[extension]'. Ensure the scope has been specified.
+2. Project Options > Sessions > Add > Under 'Rule Actions' > Add > Invoke a Burp Extension > Select '[extension]'. Ensure the scope has been specified.
 
 ## Tools
 ### burp-external-crypto-header
