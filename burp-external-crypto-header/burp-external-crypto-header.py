@@ -77,7 +77,7 @@ class BurpExtender(IBurpExtender, ISessionHandlingAction):
         headers.add('Content-Type: application/json')
 
     # Call external program to run python program. Uses locally installed pycryptodome cryptographic signing functions
-    proc = subprocess.Popen(['py',"./sign.py", StringToSign1],stdout=subprocess.PIPE)
+    proc = subprocess.Popen(['py',"./sign.py", StringToSign1],stdout=subprocess.PIPE) # Modify this line for your python instance, e.g. py sign.py anystring or python3 sign.py anystring
     output = proc.stdout.read().strip()
     proc.stdout.close()
 
