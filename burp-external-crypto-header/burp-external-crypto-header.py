@@ -67,7 +67,6 @@ class BurpExtender(IBurpExtender, ISessionHandlingAction):
         temp.append(parameter.getName() + '=' + parameter.getValue() + '&')
       api_parameters = (''.join(sorted(temp))[:-1])
       api_endpoint = api_endpoint + '?' + api_parameters
-
     # Remove old HTTP headers
     for header in newHeaders:
       if (header.startswith("Content-Type")):
@@ -80,22 +79,27 @@ class BurpExtender(IBurpExtender, ISessionHandlingAction):
         headers.remove(header)
       if (header.startswith("Content-MD5")):
         headers.remove(header)
+
     # Hacky method (no regex) to check if GET or POST/PUT HTTP method e.g. if headers has GETTEST it will be a valid GET too
     for header in newHeaders:
       if (header.startswith("GET")):
         # headers.add(test)
+        # headers.add('Content-Type: text/plain')
         StringToSign = "GET" + "\n" + timestamp + "\n" + ContentMD5 + "\n"+ ContentType + "\n" + C1_key + "\n" + api_endpoint
-        headers.add('Content-Type: text/plain')
       if (header.startswith("POST")):
+        ContentType = "application/json"
+        headers.add('Content-Type: ' + ContentType)
+        ContentMD5 = hashlib.md5(parameters).hexdigest()
+        headers.add('Content-MD5: ' + ContentMD5)
         StringToSign = "POST" + "\n" + timestamp + "\n" + ContentMD5 + "\n"+ ContentType + "\n" + C1_key + "\n" + api_endpoint
-        headers.add('Content-Type: application/json')
-        headers.add('Content-MD5: ' + hashlib.md5(parameters).hexdigest())
       if (header.startswith("PUT")):
+        ContentType = "application/json"
+        headers.add('Content-Type: ' + ContentType)
+        ContentMD5 = hashlib.md5(parameters).hexdigest()
+        headers.add('Content-MD5: ' + ContentMD5)
         StringToSign = "PUT" + "\n" + timestamp + "\n" + ContentMD5 + "\n"+ ContentType + "\n" + C1_key + "\n" + api_endpoint
-        headers.add('Content-Type: application/json')
-        headers.add('Content-MD5: ' + hashlib.md5(parameters).hexdigest())
 
-
+    headers.add(StringToSign)
     # Call external program to run python program. Uses locally installed pycryptodome cryptographic signing functions
     proc = subprocess.Popen(['py',"./sign.py", StringToSign],stdout=subprocess.PIPE)
     output = proc.stdout.read().strip()
