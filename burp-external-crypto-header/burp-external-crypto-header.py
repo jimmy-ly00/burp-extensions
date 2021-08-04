@@ -18,6 +18,7 @@ from java.io import PrintWriter
 
 import time
 import subprocess
+import urlparse
 
 class BurpExtender(IBurpExtender, ISessionHandlingAction):
   def current_milli_time(self):
@@ -49,14 +50,23 @@ class BurpExtender(IBurpExtender, ISessionHandlingAction):
     newHeaders = list(headers)
 
     reqBody = currentRequest.getRequest()[requestInfo.getBodyOffset():]
-    # parameters = self._helpers.bytesToString(reqBody)
+    parameters = self._helpers.bytesToString(reqBody)
 
     C1_key = "API_KEY"
     timestamp = self.current_milli_time()
     ContentMD5 = ""
     ContentType = ""
-    api_endpoint = "/api/v2/endpoint"
-    StringToSign1 = "GET" + "\n" + timestamp + "\n" + ContentMD5 + "\n"+ ContentType + "\n" + C1_key + "\n" + api_endpoint
+    api_endpoint = urlparse.urlparse(str(currentRequest.getUrl())).path
+    getParameters = sorted(requestInfo.getParameters())
+    
+    # Some hack way to get parameters and sort e.g. https://domain.com/?a=first&c=third&b=second will give a=first&b=second&c=third
+    # a lot of weird edge cases
+    if getParameters:
+      temp=[]
+      for parameter in getParameters:
+        temp.append(parameter.getName() + '=' + parameter.getValue() + '&')
+      api_parameters = (''.join(sorted(temp))[:-1])
+      api_endpoint = api_endpoint + '?' + api_parameters
 
     # Remove old HTTP headers
     for header in newHeaders:
@@ -68,21 +78,31 @@ class BurpExtender(IBurpExtender, ISessionHandlingAction):
         headers.remove(header)
       if (header.startswith("X-Timestamp")):
         headers.remove(header)
-
+      if (header.startswith("Content-MD5")):
+        headers.remove(header)
     # Hacky method (no regex) to check if GET or POST/PUT HTTP method e.g. if headers has GETTEST it will be a valid GET too
     for header in newHeaders:
       if (header.startswith("GET")):
+        # headers.add(test)
+        StringToSign = "GET" + "\n" + timestamp + "\n" + ContentMD5 + "\n"+ ContentType + "\n" + C1_key + "\n" + api_endpoint
         headers.add('Content-Type: text/plain')
-      if (header.startswith("POST")) or (header.startswith("PUT")):
+      if (header.startswith("POST")):
+        StringToSign = "POST" + "\n" + timestamp + "\n" + ContentMD5 + "\n"+ ContentType + "\n" + C1_key + "\n" + api_endpoint
         headers.add('Content-Type: application/json')
+        headers.add('Content-MD5: ' + hashlib.md5(parameters).hexdigest())
+      if (header.startswith("PUT")):
+        StringToSign = "PUT" + "\n" + timestamp + "\n" + ContentMD5 + "\n"+ ContentType + "\n" + C1_key + "\n" + api_endpoint
+        headers.add('Content-Type: application/json')
+        headers.add('Content-MD5: ' + hashlib.md5(parameters).hexdigest())
+
 
     # Call external program to run python program. Uses locally installed pycryptodome cryptographic signing functions
-    proc = subprocess.Popen(['py',"./sign.py", StringToSign1],stdout=subprocess.PIPE) # Modify this line for your python instance, e.g. py sign.py anystring or python3 sign.py anystring
+    proc = subprocess.Popen(['py',"./sign.py", StringToSign],stdout=subprocess.PIPE)
     output = proc.stdout.read().strip()
     proc.stdout.close()
 
-    headers.add("X-Timestamp: " + timestamp)
     headers.add("X-Signature: " + output)
+    headers.add("X-Timestamp: " + timestamp)
     headers.add("X-APIkey: " + C1_key)
 
     # Build request with new headers
